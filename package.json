@@ -1,0 +1,53 @@
+{
+  "name": "movies",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "lint:type": "npx tsc --noEmit",
+    "lint:js": "npx eslint . --max-warnings=0",
+    "lint": "npm run lint:type && npm run lint:js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start:prod": "npm run build && node dist/src/main.js",
+    "migration:run": "cd database && npx sequelize-cli db:migrate",
+    "migration:generate": "cd database && npx sequelize-cli migration:generate --name"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.28.0",
+    "@stylistic/eslint-plugin": "^4.4.1",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^22.15.30",
+    "@types/sequelize": "^4.28.20",
+    "@typescript-eslint/eslint-plugin": "^8.33.1",
+    "@typescript-eslint/parser": "^8.33.1",
+    "eslint-import-resolver-typescript": "^4.4.3",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsdoc": "^50.7.1",
+    "eslint-plugin-require-explicit-generics": "^1.0.0",
+    "eslint-plugin-sonarjs": "^3.0.2",
+    "globals": "^16.2.0",
+    "sequelize-cli": "^6.6.3",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@sequelize/core": "^7.0.0-alpha.46",
+    "@sequelize/sqlite3": "^7.0.0-alpha.46",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "http-status-codes": "^2.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1",
+    "sequelize": "^6.37.7",
+    "winston": "^3.17.0",
+    "zod": "^3.25.56"
+  }
+}
