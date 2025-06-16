@@ -116,7 +116,7 @@ class MoviesController {
       MovieImportDto
     >(
       MovieApiRoute.IMPORT,
-      handleUpload.single("file"),
+      handleUpload.single("movies"),
       async (request, response, next) => {
         try {
           if (!request.file) {
