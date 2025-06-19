@@ -7,8 +7,8 @@ import {
 
 class MoviesFileService {
   readFile(data: MovieImportDto): string {
-    if (!data || !data.file.buffer) {
-      throw new AppException("DATA_IN_FILE_REQUIRED", { file: "REQUIRED" });
+    if (!data || !data.file.buffer || data.file.size === 0) {
+      throw new AppException("DATA_IN_FILE_REQUIRED", { data: "REQUIRED" });
     }
 
     return data.file.buffer.toString("utf8");

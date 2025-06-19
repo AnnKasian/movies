@@ -1,6 +1,7 @@
 const MovieValidationRule = {
-  YEAR_MIN: 1890,
-  YEAR_MAX: 3000,
+  TITLE_MIN: 1,
+  YEAR_MIN: 1850,
+  YEAR_MAX: new Date().getFullYear(),
 } as const;
 
 export { MovieValidationRule };

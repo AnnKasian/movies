@@ -88,10 +88,28 @@ class UsersService {
   }
 
   private verifyToken(token: string): { userId: string; email: string } {
-    return jwt.verify(token, this.configService.schema.jwt.secret) as {
-      userId: string;
-      email: string;
-    };
+    try {
+      return jwt.verify(token, this.configService.schema.jwt.secret) as {
+        userId: string;
+        email: string;
+      };
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new AppException("TOKEN_EXPIRED", {
+          token: "EXPIRED",
+        });
+      }
+
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new AppException("INVALID_TOKEN", {
+          token: "INVALID",
+        });
+      }
+
+      throw new AppException("TOKEN_VERIFICATION_FAILED", {
+        token: "INVALID",
+      });
+    }
   }
 
   private generateToken(user: Users): string {

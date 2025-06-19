@@ -9,6 +9,9 @@ const userSignUpDtoSchema = z.object({
       invalid_type_error: UserValidationMessage.NAME_STRING,
     })
     .min(UserValidationRule.NAME_LENGTH, {
+      message: UserValidationMessage.NAME_LENGTH,
+    })
+    .refine((value) => value.trim().length > 0, {
       message: UserValidationMessage.NAME_EMPTY,
     }),
   email: z
