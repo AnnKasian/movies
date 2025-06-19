@@ -1,7 +1,6 @@
-import { type IncludeOptions, Op, type WhereOptions } from "@sequelize/core";
+import { col, literal, Op, type WhereOptions } from "@sequelize/core";
 import { Movies } from "../../../database/models/movies.js";
-import { Actors } from "../../../database/models/actors.js";
-import { MovieActors } from "../../../database/models/movie-actors.js";
+import { type MovieActorsRepository } from "./movie-actors.repository.js";
 import {
   type MovieQueryDto,
   type MovieCreateDto,
@@ -12,8 +11,11 @@ import {
 
 class MoviesRepository {
   private readonly movies = Movies;
-  private readonly actors = Actors;
-  private readonly movieActors = MovieActors;
+  private readonly movieActorsRepository: MovieActorsRepository;
+
+  constructor(movieActorsRepository: MovieActorsRepository) {
+    this.movieActorsRepository = movieActorsRepository;
+  }
 
   async create({
     title,
@@ -28,64 +30,39 @@ class MoviesRepository {
     });
 
     if (actors && actors.length > 0) {
-      for (const actorName of actors) {
-        const [actor] = await this.actors.findOrCreate({
-          where: { name: actorName.trim() },
-          defaults: { name: actorName.trim() },
-        });
-
-        await this.movieActors.create({
-          movieId: movie.id,
-          actorId: actor.id,
-        });
-      }
+      await this.movieActorsRepository.create(actors, movie.id);
     }
 
-    const movieWithActors = (await this.movies.findByPk(movie.id, {
-      attributes: ["id", "title", "year", "format", "createdAt", "updatedAt"],
-      include: [
-        {
-          model: Actors,
-          attributes: ["id", "name", "createdAt", "updatedAt"],
-          through: { attributes: [] },
-        },
-      ],
-      raw: false,
-    })) as Movies;
+    const movieActors = await this.movieActorsRepository.find({ id: movie.id });
 
     return {
-      id: movieWithActors.id,
-      title: movieWithActors.title,
-      year: movieWithActors.year,
-      format: movieWithActors.format,
+      id: movie.id,
+      title: movie.title,
+      year: movie.year,
+      format: movie.format,
       actors:
-        movieWithActors.actors?.map((actor) => ({
+        movieActors?.map((actor) => ({
           id: actor.id,
           name: actor.name,
           createdAt: actor.createdAt,
           updatedAt: actor.updatedAt,
         })) || [],
-      createdAt: movieWithActors.createdAt,
-      updatedAt: movieWithActors.updatedAt,
+      createdAt: movie.createdAt,
+      updatedAt: movie.updatedAt,
     };
   }
 
   async findAll(query: MovieQueryDto): Promise<Movies[]> {
     const { actor, title, search, limit, offset, order, sort } = query;
 
-    let includeOptions: IncludeOptions[] = [];
     let whereOptions: WhereOptions = {};
+    let movieIdsFromActors: string[] = [];
 
-    if (actor) {
-      includeOptions = [
-        {
-          model: Actors,
-          attributes: [],
-          where: { name: { [Op.like]: `%${actor}%` } },
-          required: true,
-          through: { attributes: [] },
-        },
-      ];
+    if (actor || search) {
+      movieIdsFromActors = await this.movieActorsRepository.findAll(
+        actor,
+        search
+      );
     }
 
     if (title) {
@@ -93,40 +70,32 @@ class MoviesRepository {
     }
 
     if (!search) {
+      if (movieIdsFromActors.length > 0) {
+        whereOptions.id = { [Op.in]: movieIdsFromActors };
+      }
+
       return await this.movies.findAll({
         attributes: ["id", "title", "year", "format", "createdAt", "updatedAt"],
         where: whereOptions,
-        include: includeOptions,
         offset,
         limit,
-        order: [[sort, order]],
+        order:
+          sort === "title"
+            ? [[literal("title COLLATE NOCASE"), order]]
+            : [[col(sort), order]],
       });
     }
 
     const moviesByTitle = await this.movies.findAll({
-      attributes: ["id", "title", "year", "format", "createdAt", "updatedAt"],
+      attributes: ["id"],
       where: {
         title: { [Op.like]: `%${search}%` },
       },
     });
 
-    const moviesByActor = await this.movies.findAll({
-      attributes: ["id"],
-      include: [
-        {
-          model: Actors,
-          attributes: [],
-          where: { name: { [Op.like]: `%${search}%` } },
-          required: true,
-          through: { attributes: [] },
-        },
-      ],
-    });
+    const titleMovieIds = moviesByTitle.map((m) => m.id);
 
-    const allMovieIds = [
-      ...moviesByTitle.map((m) => m.id),
-      ...moviesByActor.map((m) => m.id),
-    ];
+    const allMovieIds = [...titleMovieIds, ...movieIdsFromActors];
     const uniqueMovieIds = [...new Set(allMovieIds)];
 
     if (uniqueMovieIds.length === 0) {
@@ -140,7 +109,10 @@ class MoviesRepository {
       },
       offset,
       limit,
-      order: [[sort, order]],
+      order:
+        sort === "title"
+          ? [[literal("title COLLATE NOCASE"), order]]
+          : [[col(sort), order]],
     });
   }
 
@@ -160,21 +132,7 @@ class MoviesRepository {
     );
 
     if (actors?.length) {
-      await this.movieActors.destroy({
-        where: { movieId: id },
-      });
-
-      for (const actorName of actors) {
-        const [actor] = await this.actors.findOrCreate({
-          where: { name: actorName.trim() },
-          defaults: { name: actorName.trim() },
-        });
-
-        await this.movieActors.create({
-          movieId: id,
-          actorId: actor.id,
-        });
-      }
+      await this.movieActorsRepository.update(actors, id);
     }
 
     return updateResult;
@@ -187,18 +145,13 @@ class MoviesRepository {
         ...(data.id && { id: data.id }),
         ...(data.title && { title: data.title }),
       },
-      include: [
-        {
-          model: Actors,
-          attributes: ["id", "name", "createdAt", "updatedAt"],
-          through: { attributes: [] },
-        },
-      ],
     });
 
     if (!movie) {
       return null;
     }
+
+    const actors = await this.movieActorsRepository.find({ id: movie?.id });
 
     return {
       id: movie.id,
@@ -208,7 +161,7 @@ class MoviesRepository {
       createdAt: movie.createdAt,
       updatedAt: movie.updatedAt,
       actors:
-        movie.actors?.map((actor) => ({
+        actors?.map((actor) => ({
           id: actor.id,
           name: actor.name,
           createdAt: actor.createdAt,
@@ -218,9 +171,7 @@ class MoviesRepository {
   }
 
   async delete(id: string): Promise<number> {
-    await this.movieActors.destroy({
-      where: { movieId: id },
-    });
+    await this.movieActorsRepository.delete(id);
 
     return await this.movies.destroy({
       where: { id },
